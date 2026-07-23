@@ -330,15 +330,7 @@
   <div class="sub">stock de casa + lista de compras</div>
 </header>
 
-<div class="wrap" id="configWrap" style="display:none;">
-  <div class="config-banner">
-    Pegá acá la URL de tu Web App de Apps Script (la que obtenés al hacer <em>Deploy &gt; New deployment</em>).
-    <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
-    <button class="btn" id="saveApiUrl">Guardar y conectar</button>
-  </div>
-</div>
-
-<nav class="tabs" id="tabs" style="display:none;">
+<nav class="tabs" id="tabs">
   <button class="active" data-view="stock">Stock</button>
   <button data-view="lista">Lista de compras</button>
 </nav>
@@ -423,8 +415,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const LS_KEY = 'despensa_api_url';
-let API_URL = localStorage.getItem(LS_KEY) || '';
+const API_URL = 'https://script.google.com/macros/s/AKfycbw9eyKbEYttKnGiYGckf2xTMX_kOt_fH-P4R5Q3cMznrQfke9lvm8eJKPemMOTS6efk/exec';
 let STATE = { stock: [], lista: [] };
 
 const $ = sel => document.querySelector(sel);
@@ -694,32 +685,8 @@ $('#m_save').addEventListener('click', async () => {
   toast('Agregado a la lista');
 });
 
-// ---------- Config ----------
-function initConfig(){
-  if(!API_URL){
-    $('#configWrap').style.display = 'block';
-    $('#tabs').style.display = 'none';
-  } else {
-    $('#configWrap').style.display = 'none';
-    $('#tabs').style.display = 'flex';
-    loadData();
-  }
-}
-
-$('#saveApiUrl').addEventListener('click', () => {
-  const url = $('#apiUrlInput').value.trim();
-  if(!url.startsWith('https://script.google.com/')){
-    toast('Pegá la URL completa del Web App', true);
-    return;
-  }
-  API_URL = url;
-  localStorage.setItem(LS_KEY, url);
-  $('#configWrap').style.display = 'none';
-  $('#tabs').style.display = 'flex';
-  loadData();
-});
-
-initConfig();
+// ---------- Init ----------
+loadData();
 </script>
 </body>
 </html>
