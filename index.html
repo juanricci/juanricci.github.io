@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Despensa — Stock y Compras</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F6F5EF;
+    --paper-card: #FFFFFF;
+    --ink: #1F2A1F;
+    --ink-soft: #55604F;
+    --green: #2F6B4F;
+    --green-dark: #1F4D38;
+    --amber: #B8862B;
+    --amber-bg: #FBF1DD;
+    --red: #B5432E;
+    --line: #D8D4C4;
+    --line-dotted: #C9C5B8;
+    --shadow: 0 1px 2px rgba(31,42,31,0.06), 0 4px 14px rgba(31,42,31,0.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Public Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:0 16px;}
+
+  header.top{
+    padding:28px 16px 16px;
+    max-width:640px;
+    margin:0 auto;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .brand h1{
+    font-family:'Archivo Black', sans-serif;
+    font-size:28px;
+    letter-spacing:-0.5px;
+    margin:0;
+    color:var(--green-dark);
+    text-transform:lowercase;
+  }
+  .brand .tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:2px 8px;
+  }
+  .sub{color:var(--ink-soft); font-size:14px; margin-top:4px;}
+
+  nav.tabs{
+    display:flex;
+    gap:4px;
+    margin:20px auto 0;
+    max-width:640px;
+    padding:0 16px;
+  }
+  nav.tabs button{
+    flex:1;
+    font-family:'Public Sans', sans-serif;
+    font-weight:700;
+    font-size:14px;
+    padding:10px 12px;
+    border:none;
+    background:transparent;
+    color:var(--ink-soft);
+    border-bottom:2px solid var(--line);
+    cursor:pointer;
+    transition:color .15s;
+  }
+  nav.tabs button.active{
+    color:var(--green-dark);
+    border-bottom:2px solid var(--green);
+  }
+
+  section.view{display:none; padding-top:18px;}
+  section.view.active{display:block;}
+
+  .toolbar{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  select, input[type=text], input[type=number]{
+    font-family:'Public Sans', sans-serif;
+    font-size:14px;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--paper-card);
+    color:var(--ink);
+  }
+  select{flex:1; min-width:120px;}
+
+  button.btn{
+    font-family:'Public Sans', sans-serif;
+    font-weight:700;
+    font-size:13px;
+    padding:9px 14px;
+    border-radius:8px;
+    border:none;
+    cursor:pointer;
+    background:var(--green);
+    color:#fff;
+    white-space:nowrap;
+  }
+  button.btn.secondary{
+    background:var(--paper-card);
+    color:var(--green-dark);
+    border:1px solid var(--line);
+  }
+  button.btn.ghost{
+    background:transparent;
+    color:var(--ink-soft);
+    border:1px dashed var(--line);
+  }
+  button.btn:active{transform:translateY(1px);}
+
+  .receipt{
+    background:var(--paper-card);
+    border-radius:10px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+    margin-bottom:16px;
+  }
+  .cat-heading{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    padding:10px 14px 4px;
+    background:var(--paper-card);
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 14px;
+    border-bottom:1px dotted var(--line-dotted);
+  }
+  .row:last-child{border-bottom:none;}
+  .row.low{
+    background:var(--amber-bg);
+  }
+  .row.low .name::after{
+    content:"bajo mínimo";
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    color:var(--amber);
+    margin-left:8px;
+    border:1px solid var(--amber);
+    border-radius:20px;
+    padding:1px 6px;
+  }
+  .row .name{
+    flex:1;
+    font-weight:600;
+    font-size:14.5px;
+    min-width:0;
+  }
+  .row .cat-pill{
+    display:block;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    color:var(--ink-soft);
+    font-weight:500;
+  }
+  .qty-controls{
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .qty-controls button{
+    width:26px;height:26px;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    font-size:16px;
+    line-height:1;
+    cursor:pointer;
+    color:var(--green-dark);
+    font-weight:700;
+  }
+  .qty-val{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size:14px;
+    min-width:44px;
+    text-align:center;
+  }
+  .row .del{
+    background:none;border:none;color:var(--line-dotted);cursor:pointer;font-size:16px;padding:2px 4px;
+  }
+  .row .del:hover{color:var(--red);}
+
+  .check-row{
+    display:flex;align-items:center;gap:10px;
+  }
+  .check-row input[type=checkbox]{
+    width:18px;height:18px;accent-color:var(--green);
+  }
+  .check-row.done .name{
+    text-decoration:line-through;
+    color:var(--ink-soft);
+  }
+  .origin-auto{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    color:var(--green-dark);
+    background:#E4EFE8;
+    border-radius:20px;
+    padding:1px 6px;
+    margin-left:6px;
+  }
+
+  .empty{
+    text-align:center;
+    padding:36px 16px;
+    color:var(--ink-soft);
+    font-size:14px;
+  }
+  .empty .icon{font-size:28px; display:block; margin-bottom:8px;}
+
+  /* torn edge signature on the shopping list card */
+  .receipt.tear{
+    position:relative;
+    margin-bottom:26px;
+  }
+  .receipt.tear::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:-9px;
+    height:10px;
+    background:
+      linear-gradient(-45deg, var(--paper) 6px, transparent 0),
+      linear-gradient(45deg, var(--paper) 6px, transparent 0);
+    background-size:12px 12px;
+    background-repeat:repeat-x;
+  }
+
+  dialog{
+    border:none;
+    border-radius:14px;
+    padding:0;
+    max-width:400px;
+    width:90%;
+    box-shadow:var(--shadow);
+  }
+  dialog::backdrop{background:rgba(31,42,31,0.35);}
+  .modal{padding:20px;}
+  .modal h2{
+    font-family:'Archivo Black', sans-serif;
+    font-size:18px;
+    margin:0 0 14px;
+    color:var(--green-dark);
+    text-transform:lowercase;
+  }
+  .field{margin-bottom:12px;}
+  .field label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .field input{width:100%;}
+  .field-row{display:flex; gap:10px;}
+  .field-row .field{flex:1;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:16px;}
+
+  .config-banner{
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+    margin-bottom:16px;
+    font-size:13.5px;
+    color:var(--ink-soft);
+  }
+  .config-banner input{width:100%; margin-top:8px;}
+  .config-banner .btn{margin-top:10px;}
+
+  .toast{
+    position:fixed;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%) translateY(120%);
+    background:var(--green-dark);
+    color:#fff;
+    padding:10px 18px;
+    border-radius:8px;
+    font-size:13.5px;
+    font-weight:600;
+    transition:transform .25s ease;
+    z-index:50;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  .toast.error{background:var(--red);}
+
+  ::selection{background:var(--green); color:#fff;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1>despensa</h1>
+    <span class="tag" id="statusTag">offline</span>
+  </div>
+  <div class="sub">stock de casa + lista de compras</div>
+</header>
+
+<div class="wrap" id="configWrap" style="display:none;">
+  <div class="config-banner">
+    Pegá acá la URL de tu Web App de Apps Script (la que obtenés al hacer <em>Deploy &gt; New deployment</em>).
+    <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+    <button class="btn" id="saveApiUrl">Guardar y conectar</button>
+  </div>
+</div>
+
+<nav class="tabs" id="tabs" style="display:none;">
+  <button class="active" data-view="stock">Stock</button>
+  <button data-view="lista">Lista de compras</button>
+</nav>
+
+<div class="wrap">
+
+  <section class="view active" id="view-stock">
+    <div class="toolbar">
+      <select id="catFilter"><option value="">Todas las categorías</option></select>
+      <button class="btn" id="btnAddProduct">+ Producto</button>
+    </div>
+    <div id="stockList"></div>
+  </section>
+
+  <section class="view" id="view-lista">
+    <div class="toolbar">
+      <button class="btn secondary" id="btnSuggest">Generar sugerencias</button>
+      <button class="btn ghost" id="btnClearDone">Vaciar comprados</button>
+      <button class="btn" id="btnAddManual">+ Item</button>
+    </div>
+    <div id="listaList"></div>
+  </section>
+
+</div>
+
+<dialog id="dlgProduct">
+  <div class="modal">
+    <h2>nuevo producto</h2>
+    <div class="field">
+      <label>Nombre</label>
+      <input type="text" id="p_nombre" placeholder="Ej: Aceite de girasol">
+    </div>
+    <div class="field">
+      <label>Categoría</label>
+      <input type="text" id="p_categoria" placeholder="Ej: Almacén" list="catDatalist">
+      <datalist id="catDatalist"></datalist>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Cantidad actual</label>
+        <input type="number" id="p_cantidad" value="1" min="0">
+      </div>
+      <div class="field">
+        <label>Unidad</label>
+        <input type="text" id="p_unidad" value="u" placeholder="u, kg, L...">
+      </div>
+    </div>
+    <div class="field">
+      <label>Stock mínimo (aviso de reposición)</label>
+      <input type="number" id="p_min" value="1" min="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="p_cancel">Cancelar</button>
+      <button class="btn" id="p_save">Guardar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgManual">
+  <div class="modal">
+    <h2>agregar a la lista</h2>
+    <div class="field">
+      <label>Producto</label>
+      <input type="text" id="m_nombre" placeholder="Ej: Servilletas">
+    </div>
+    <div class="field">
+      <label>Categoría</label>
+      <input type="text" id="m_categoria" placeholder="Ej: Limpieza" list="catDatalist2">
+      <datalist id="catDatalist2"></datalist>
+    </div>
+    <div class="field">
+      <label>Cantidad</label>
+      <input type="number" id="m_cantidad" value="1" min="1">
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="m_cancel">Cancelar</button>
+      <button class="btn" id="m_save">Agregar</button>
+    </div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const LS_KEY = 'despensa_api_url';
+let API_URL = localStorage.getItem(LS_KEY) || '';
+let STATE = { stock: [], lista: [] };
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+function toast(msg, isError){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('error', !!isError);
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.classList.remove('show'), 2600);
+}
+
+function setStatus(ok){
+  const tag = $('#statusTag');
+  tag.textContent = ok ? 'conectado' : 'offline';
+  tag.style.color = ok ? 'var(--green-dark)' : 'var(--red)';
+  tag.style.borderColor = ok ? 'var(--green)' : 'var(--red)';
+}
+
+async function api(action, payload){
+  if(!API_URL){ toast('Configurá la URL de la API primero', true); throw new Error('no api url'); }
+  try{
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+      body: JSON.stringify({ action, payload: payload || {} })
+    });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error || 'Error desconocido');
+    setStatus(true);
+    return json.data;
+  }catch(err){
+    setStatus(false);
+    toast('Error: ' + err.message, true);
+    throw err;
+  }
+}
+
+async function loadData(){
+  if(!API_URL) return;
+  try{
+    const res = await fetch(API_URL, { method:'GET' });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    STATE = json.data;
+    setStatus(true);
+    renderAll();
+  }catch(err){
+    setStatus(false);
+    toast('No se pudo conectar: ' + err.message, true);
+  }
+}
+
+function categorias(){
+  const cats = new Set();
+  STATE.stock.forEach(p => cats.add(p.categoria || 'Sin categoría'));
+  return Array.from(cats).sort();
+}
+
+function renderCatOptions(){
+  const cats = categorias();
+  const sel = $('#catFilter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todas las categorías</option>' +
+    cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  sel.value = current;
+
+  ['#catDatalist', '#catDatalist2'].forEach(id => {
+    $(id).innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
+  });
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[m]));
+}
+
+function groupBy(items, key){
+  const map = {};
+  items.forEach(i => {
+    const k = i[key] || 'Sin categoría';
+    if(!map[k]) map[k] = [];
+    map[k].push(i);
+  });
+  return map;
+}
+
+function renderStock(){
+  const filter = $('#catFilter').value;
+  const items = STATE.stock
+    .filter(p => !filter || p.categoria === filter)
+    .sort((a,b) => (a.categoria||'').localeCompare(b.categoria||'') || a.producto.localeCompare(b.producto));
+
+  const container = $('#stockList');
+  if(items.length === 0){
+    container.innerHTML = `<div class="receipt"><div class="empty"><span class="icon">🗃️</span>No hay productos cargados todavía.<br>Tocá "+ Producto" para empezar.</div></div>`;
+    return;
+  }
+
+  const grouped = groupBy(items, 'categoria');
+  let html = '<div class="receipt">';
+  Object.keys(grouped).sort().forEach(cat => {
+    html += `<div class="cat-heading">${escapeHtml(cat)}</div>`;
+    grouped[cat].forEach(p => {
+      const low = Number(p.cantidad) <= Number(p.stockMinimo);
+      html += `
+        <div class="row ${low ? 'low' : ''}" data-id="${p.id}">
+          <div class="name">${escapeHtml(p.producto)}<span class="cat-pill">min: ${p.stockMinimo} ${escapeHtml(p.unidad)}</span></div>
+          <div class="qty-controls">
+            <button data-act="dec" data-id="${p.id}">−</button>
+            <span class="qty-val">${p.cantidad} ${escapeHtml(p.unidad)}</span>
+            <button data-act="inc" data-id="${p.id}">+</button>
+          </div>
+          <button class="del" data-act="delProduct" data-id="${p.id}">✕</button>
+        </div>`;
+    });
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderLista(){
+  const container = $('#listaList');
+  const pendientes = STATE.lista.filter(i => !i.comprado);
+  const comprados = STATE.lista.filter(i => i.comprado);
+
+  if(STATE.lista.length === 0){
+    container.innerHTML = `<div class="receipt tear"><div class="empty"><span class="icon">🧾</span>Tu lista está vacía.<br>Agregá algo manual o generá sugerencias desde el stock.</div></div>`;
+    return;
+  }
+
+  let html = '<div class="receipt tear">';
+  const grouped = groupBy(pendientes, 'categoria');
+  Object.keys(grouped).sort().forEach(cat => {
+    html += `<div class="cat-heading">${escapeHtml(cat)}</div>`;
+    grouped[cat].forEach(i => {
+      html += listRow(i, false);
+    });
+  });
+  if(comprados.length){
+    html += `<div class="cat-heading">Ya comprados</div>`;
+    comprados.forEach(i => html += listRow(i, true));
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function listRow(i, done){
+  return `
+    <div class="row check-row ${done ? 'done' : ''}" data-id="${i.id}">
+      <input type="checkbox" data-act="toggle" data-id="${i.id}" ${done ? 'checked' : ''}>
+      <div class="name">${escapeHtml(i.producto)} ${i.origen === 'auto' ? '<span class="origin-auto">auto</span>' : ''}<span class="cat-pill">cant: ${i.cantidad}</span></div>
+      <button class="del" data-act="delLista" data-id="${i.id}">✕</button>
+    </div>`;
+}
+
+function renderAll(){
+  renderCatOptions();
+  renderStock();
+  renderLista();
+}
+
+// ---------- Tabs ----------
+$$('nav.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('nav.tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    $$('.view').forEach(v => v.classList.remove('active'));
+    $('#view-' + btn.dataset.view).classList.add('active');
+  });
+});
+
+$('#catFilter').addEventListener('change', renderStock);
+
+// ---------- Stock actions ----------
+$('#stockList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.act === 'inc'){
+    STATE = await api('adjustStock', { id, delta: 1 });
+    renderAll();
+  } else if(btn.dataset.act === 'dec'){
+    STATE = await api('adjustStock', { id, delta: -1 });
+    renderAll();
+  } else if(btn.dataset.act === 'delProduct'){
+    if(confirm('¿Eliminar este producto del stock?')){
+      STATE = await api('deleteProduct', { id });
+      renderAll();
+    }
+  }
+});
+
+$('#btnAddProduct').addEventListener('click', () => {
+  $('#p_nombre').value = '';
+  $('#p_categoria').value = '';
+  $('#p_cantidad').value = 1;
+  $('#p_unidad').value = 'u';
+  $('#p_min').value = 1;
+  $('#dlgProduct').showModal();
+});
+$('#p_cancel').addEventListener('click', () => $('#dlgProduct').close());
+$('#p_save').addEventListener('click', async () => {
+  const nombre = $('#p_nombre').value.trim();
+  if(!nombre){ toast('Poné un nombre', true); return; }
+  const payload = {
+    producto: nombre,
+    categoria: $('#p_categoria').value.trim() || 'Sin categoría',
+    cantidad: $('#p_cantidad').value,
+    unidad: $('#p_unidad').value.trim() || 'u',
+    stockMinimo: $('#p_min').value
+  };
+  STATE = await api('addProduct', payload);
+  renderAll();
+  $('#dlgProduct').close();
+  toast('Producto agregado');
+});
+
+// ---------- Lista actions ----------
+$('#listaList').addEventListener('click', async (e) => {
+  const target = e.target;
+  const id = target.dataset.id;
+  if(!id) return;
+  if(target.dataset.act === 'toggle'){
+    STATE = await api('toggleComprado', { id });
+    renderAll();
+  } else if(target.dataset.act === 'delLista'){
+    STATE = await api('deleteFromShoppingList', { id });
+    renderAll();
+  }
+});
+
+$('#btnSuggest').addEventListener('click', async () => {
+  STATE = await api('generateSuggestions');
+  renderAll();
+  toast('Sugerencias generadas');
+});
+
+$('#btnClearDone').addEventListener('click', async () => {
+  STATE = await api('clearComprados');
+  renderAll();
+  toast('Lista limpiada');
+});
+
+$('#btnAddManual').addEventListener('click', () => {
+  $('#m_nombre').value = '';
+  $('#m_categoria').value = '';
+  $('#m_cantidad').value = 1;
+  $('#dlgManual').showModal();
+});
+$('#m_cancel').addEventListener('click', () => $('#dlgManual').close());
+$('#m_save').addEventListener('click', async () => {
+  const nombre = $('#m_nombre').value.trim();
+  if(!nombre){ toast('Poné un nombre', true); return; }
+  const payload = {
+    producto: nombre,
+    categoria: $('#m_categoria').value.trim() || 'Sin categoría',
+    cantidad: $('#m_cantidad').value,
+    origen: 'manual'
+  };
+  STATE = await api('addToShoppingList', payload);
+  renderAll();
+  $('#dlgManual').close();
+  toast('Agregado a la lista');
+});
+
+// ---------- Config ----------
+function initConfig(){
+  if(!API_URL){
+    $('#configWrap').style.display = 'block';
+    $('#tabs').style.display = 'none';
+  } else {
+    $('#configWrap').style.display = 'none';
+    $('#tabs').style.display = 'flex';
+    loadData();
+  }
+}
+
+$('#saveApiUrl').addEventListener('click', () => {
+  const url = $('#apiUrlInput').value.trim();
+  if(!url.startsWith('https://script.google.com/')){
+    toast('Pegá la URL completa del Web App', true);
+    return;
+  }
+  API_URL = url;
+  localStorage.setItem(LS_KEY, url);
+  $('#configWrap').style.display = 'none';
+  $('#tabs').style.display = 'flex';
+  loadData();
+});
+
+initConfig();
+</script>
+</body>
+</html>
