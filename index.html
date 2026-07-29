@@ -416,7 +416,9 @@
 
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbw9eyKbEYttKnGiYGckf2xTMX_kOt_fH-P4R5Q3cMznrQfke9lvm8eJKPemMOTS6efk/exec';
+const API_TOKEN = '91e25726f3efbc14634750657c43dcddc2d41d3786be2ee1';
 let STATE = { stock: [], lista: [] };
+let editingId = null;
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -443,7 +445,7 @@ async function api(action, payload){
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
-      body: JSON.stringify({ action, payload: payload || {} })
+      body: JSON.stringify({ action, token: API_TOKEN, payload: payload || {} })
     });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error || 'Error desconocido');
@@ -459,7 +461,7 @@ async function api(action, payload){
 async function loadData(){
   if(!API_URL) return;
   try{
-    const res = await fetch(API_URL, { method:'GET' });
+    const res = await fetch(API_URL + '?token=' + encodeURIComponent(API_TOKEN), { method:'GET' });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     STATE = json.data;
@@ -468,6 +470,21 @@ async function loadData(){
   }catch(err){
     setStatus(false);
     toast('No se pudo conectar: ' + err.message, true);
+  }
+}
+
+// ---------- Loading state ----------
+function setBusy(el, busy){
+  if(!el) return;
+  if(busy){
+    el._label = el._label ?? el.textContent;
+    el.disabled = true;
+    el.dataset.busy = '1';
+    el.textContent = '…';
+  } else {
+    el.disabled = false;
+    delete el.dataset.busy;
+    if(el._label !== undefined) el.textContent = el._label;
   }
 }
 
@@ -526,7 +543,7 @@ function renderStock(){
       const low = Number(p.cantidad) <= Number(p.stockMinimo);
       html += `
         <div class="row ${low ? 'low' : ''}" data-id="${p.id}">
-          <div class="name">${escapeHtml(p.producto)}<span class="cat-pill">min: ${p.stockMinimo} ${escapeHtml(p.unidad)}</span></div>
+          <div class="name" data-act="editProduct" data-id="${p.id}" style="cursor:pointer">${escapeHtml(p.producto)}<span class="cat-pill">min: ${p.stockMinimo} ${escapeHtml(p.unidad)}</span></div>
           <div class="qty-controls">
             <button data-act="dec" data-id="${p.id}">−</button>
             <span class="qty-val">${p.cantidad} ${escapeHtml(p.unidad)}</span>
@@ -595,31 +612,40 @@ $('#catFilter').addEventListener('change', renderStock);
 
 // ---------- Stock actions ----------
 $('#stockList').addEventListener('click', async (e) => {
-  const btn = e.target.closest('button');
-  if(!btn) return;
-  const id = btn.dataset.id;
-  if(btn.dataset.act === 'inc'){
+  const target = e.target.closest('[data-act]');
+  if(!target) return;
+  const id = target.dataset.id;
+  if(target.dataset.act === 'editProduct'){
+    openProductDialog(STATE.stock.find(p => p.id === id));
+  } else if(target.dataset.act === 'inc'){
+    setBusy(target, true);
     STATE = await api('adjustStock', { id, delta: 1 });
     renderAll();
-  } else if(btn.dataset.act === 'dec'){
+  } else if(target.dataset.act === 'dec'){
+    setBusy(target, true);
     STATE = await api('adjustStock', { id, delta: -1 });
     renderAll();
-  } else if(btn.dataset.act === 'delProduct'){
+  } else if(target.dataset.act === 'delProduct'){
     if(confirm('¿Eliminar este producto del stock?')){
+      setBusy(target, true);
       STATE = await api('deleteProduct', { id });
       renderAll();
     }
   }
 });
 
-$('#btnAddProduct').addEventListener('click', () => {
-  $('#p_nombre').value = '';
-  $('#p_categoria').value = '';
-  $('#p_cantidad').value = 1;
-  $('#p_unidad').value = 'u';
-  $('#p_min').value = 1;
+function openProductDialog(product){
+  editingId = product ? product.id : null;
+  $('#dlgProduct h2').textContent = product ? 'editar producto' : 'nuevo producto';
+  $('#p_nombre').value = product ? product.producto : '';
+  $('#p_categoria').value = product ? product.categoria : '';
+  $('#p_cantidad').value = product ? product.cantidad : 1;
+  $('#p_unidad').value = product ? product.unidad : 'u';
+  $('#p_min').value = product ? product.stockMinimo : 1;
   $('#dlgProduct').showModal();
-});
+}
+
+$('#btnAddProduct').addEventListener('click', () => openProductDialog(null));
 $('#p_cancel').addEventListener('click', () => $('#dlgProduct').close());
 $('#p_save').addEventListener('click', async () => {
   const nombre = $('#p_nombre').value.trim();
@@ -631,10 +657,21 @@ $('#p_save').addEventListener('click', async () => {
     unidad: $('#p_unidad').value.trim() || 'u',
     stockMinimo: $('#p_min').value
   };
-  STATE = await api('addProduct', payload);
-  renderAll();
-  $('#dlgProduct').close();
-  toast('Producto agregado');
+  setBusy($('#p_save'), true);
+  try{
+    if(editingId){
+      payload.id = editingId;
+      STATE = await api('updateProduct', payload);
+      toast('Producto actualizado');
+    } else {
+      STATE = await api('addProduct', payload);
+      toast('Producto agregado');
+    }
+    renderAll();
+    $('#dlgProduct').close();
+  } finally {
+    setBusy($('#p_save'), false);
+  }
 });
 
 // ---------- Lista actions ----------
@@ -643,24 +680,38 @@ $('#listaList').addEventListener('click', async (e) => {
   const id = target.dataset.id;
   if(!id) return;
   if(target.dataset.act === 'toggle'){
+    setBusy(target, true);
     STATE = await api('toggleComprado', { id });
     renderAll();
   } else if(target.dataset.act === 'delLista'){
+    setBusy(target, true);
     STATE = await api('deleteFromShoppingList', { id });
     renderAll();
   }
 });
 
 $('#btnSuggest').addEventListener('click', async () => {
-  STATE = await api('generateSuggestions');
-  renderAll();
-  toast('Sugerencias generadas');
+  const btn = $('#btnSuggest');
+  setBusy(btn, true);
+  try{
+    STATE = await api('generateSuggestions');
+    renderAll();
+    toast('Sugerencias generadas');
+  } finally {
+    setBusy(btn, false);
+  }
 });
 
 $('#btnClearDone').addEventListener('click', async () => {
-  STATE = await api('clearComprados');
-  renderAll();
-  toast('Lista limpiada');
+  const btn = $('#btnClearDone');
+  setBusy(btn, true);
+  try{
+    STATE = await api('clearComprados');
+    renderAll();
+    toast('Lista limpiada');
+  } finally {
+    setBusy(btn, false);
+  }
 });
 
 $('#btnAddManual').addEventListener('click', () => {
@@ -679,10 +730,15 @@ $('#m_save').addEventListener('click', async () => {
     cantidad: $('#m_cantidad').value,
     origen: 'manual'
   };
-  STATE = await api('addToShoppingList', payload);
-  renderAll();
-  $('#dlgManual').close();
-  toast('Agregado a la lista');
+  setBusy($('#m_save'), true);
+  try{
+    STATE = await api('addToShoppingList', payload);
+    renderAll();
+    $('#dlgManual').close();
+    toast('Agregado a la lista');
+  } finally {
+    setBusy($('#m_save'), false);
+  }
 });
 
 // ---------- Init ----------
