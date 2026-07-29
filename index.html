@@ -106,6 +106,7 @@
     color:var(--ink);
   }
   select{flex:1; min-width:120px;}
+  #stockSearch, #listaSearch{flex:1; min-width:120px;}
 
   button.btn{
     font-family:'Public Sans', sans-serif;
@@ -339,6 +340,7 @@
 
   <section class="view active" id="view-stock">
     <div class="toolbar">
+      <input type="text" id="stockSearch" placeholder="Buscar producto...">
       <select id="catFilter"><option value="">Todas las categorías</option></select>
       <button class="btn" id="btnAddProduct">+ Producto</button>
     </div>
@@ -347,6 +349,7 @@
 
   <section class="view" id="view-lista">
     <div class="toolbar">
+      <input type="text" id="listaSearch" placeholder="Buscar producto...">
       <button class="btn secondary" id="btnSuggest">Generar sugerencias</button>
       <button class="btn ghost" id="btnClearDone">Vaciar comprados</button>
       <button class="btn" id="btnAddManual">+ Item</button>
@@ -525,13 +528,17 @@ function groupBy(items, key){
 
 function renderStock(){
   const filter = $('#catFilter').value;
+  const search = $('#stockSearch').value.trim().toLowerCase();
   const items = STATE.stock
     .filter(p => !filter || p.categoria === filter)
+    .filter(p => !search || p.producto.toLowerCase().includes(search))
     .sort((a,b) => (a.categoria||'').localeCompare(b.categoria||'') || a.producto.localeCompare(b.producto));
 
   const container = $('#stockList');
   if(items.length === 0){
-    container.innerHTML = `<div class="receipt"><div class="empty"><span class="icon">🗃️</span>No hay productos cargados todavía.<br>Tocá "+ Producto" para empezar.</div></div>`;
+    container.innerHTML = STATE.stock.length === 0
+      ? `<div class="receipt"><div class="empty"><span class="icon">🗃️</span>No hay productos cargados todavía.<br>Tocá "+ Producto" para empezar.</div></div>`
+      : `<div class="receipt"><div class="empty"><span class="icon">🔍</span>Ningún producto coincide con la búsqueda.</div></div>`;
     return;
   }
 
@@ -559,11 +566,17 @@ function renderStock(){
 
 function renderLista(){
   const container = $('#listaList');
-  const pendientes = STATE.lista.filter(i => !i.comprado);
-  const comprados = STATE.lista.filter(i => i.comprado);
+  const search = $('#listaSearch').value.trim().toLowerCase();
+  const filtered = STATE.lista.filter(i => !search || i.producto.toLowerCase().includes(search));
+  const pendientes = filtered.filter(i => !i.comprado);
+  const comprados = filtered.filter(i => i.comprado);
 
   if(STATE.lista.length === 0){
     container.innerHTML = `<div class="receipt tear"><div class="empty"><span class="icon">🧾</span>Tu lista está vacía.<br>Agregá algo manual o generá sugerencias desde el stock.</div></div>`;
+    return;
+  }
+  if(filtered.length === 0){
+    container.innerHTML = `<div class="receipt tear"><div class="empty"><span class="icon">🔍</span>Ningún item coincide con la búsqueda.</div></div>`;
     return;
   }
 
@@ -609,6 +622,8 @@ $$('nav.tabs button').forEach(btn => {
 });
 
 $('#catFilter').addEventListener('change', renderStock);
+$('#stockSearch').addEventListener('input', renderStock);
+$('#listaSearch').addEventListener('input', renderLista);
 
 // ---------- Stock actions ----------
 $('#stockList').addEventListener('click', async (e) => {
