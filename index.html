@@ -312,6 +312,17 @@
     z-index:50;
   }
   .toast.show{transform:translateX(-50%) translateY(0);}
+  .toastUndo{
+    background:none;
+    border:none;
+    color:#fff;
+    text-decoration:underline;
+    font-weight:700;
+    font-size:13.5px;
+    cursor:pointer;
+    padding:0;
+    margin-left:14px;
+  }
   .toast.error{background:var(--red);}
 
   ::selection{background:var(--green); color:#fff;}
@@ -415,7 +426,7 @@
   </div>
 </dialog>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo" class="toastUndo" style="display:none">Deshacer</button></div>
 
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbw9eyKbEYttKnGiYGckf2xTMX_kOt_fH-P4R5Q3cMznrQfke9lvm8eJKPemMOTS6efk/exec';
@@ -426,13 +437,21 @@ let editingId = null;
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
 
-function toast(msg, isError){
+function toast(msg, isError, undoFn){
   const t = $('#toast');
-  t.textContent = msg;
+  $('#toastMsg').textContent = msg;
+  const undoBtn = $('#toastUndo');
+  if(undoFn){
+    undoBtn.style.display = 'inline';
+    undoBtn.onclick = () => { clearTimeout(t._timer); t.classList.remove('show'); undoFn(); };
+  } else {
+    undoBtn.style.display = 'none';
+    undoBtn.onclick = null;
+  }
   t.classList.toggle('error', !!isError);
   t.classList.add('show');
   clearTimeout(t._timer);
-  t._timer = setTimeout(()=> t.classList.remove('show'), 2600);
+  t._timer = setTimeout(()=> t.classList.remove('show'), undoFn ? 5000 : 2600);
 }
 
 function setStatus(ok){
@@ -442,10 +461,28 @@ function setStatus(ok){
   tag.style.borderColor = ok ? 'var(--green)' : 'var(--red)';
 }
 
+// Reintenta ante caídas de red o cold-starts lentos de Apps Script (no ante
+// errores de la aplicación, esos ya vinieron con respuesta y no van a cambiar).
+async function fetchWithRetry(url, options, retries = 2, timeoutMs = 12000, backoffMs = 1000){
+  for(let attempt = 0; attempt <= retries; attempt++){
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try{
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
+      return res;
+    }catch(err){
+      clearTimeout(timer);
+      if(attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, backoffMs * (attempt + 1)));
+    }
+  }
+}
+
 async function api(action, payload){
   if(!API_URL){ toast('Configurá la URL de la API primero', true); throw new Error('no api url'); }
   try{
-    const res = await fetch(API_URL, {
+    const res = await fetchWithRetry(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
       body: JSON.stringify({ action, token: API_TOKEN, payload: payload || {} })
@@ -464,7 +501,7 @@ async function api(action, payload){
 async function loadData(){
   if(!API_URL) return;
   try{
-    const res = await fetch(API_URL + '?token=' + encodeURIComponent(API_TOKEN), { method:'GET' });
+    const res = await fetchWithRetry(API_URL + '?token=' + encodeURIComponent(API_TOKEN), { method:'GET' });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     STATE = json.data;
@@ -495,6 +532,19 @@ function categorias(){
   const cats = new Set();
   STATE.stock.forEach(p => cats.add(p.categoria || 'Sin categoría'));
   return Array.from(cats).sort();
+}
+
+// Evita categorías duplicadas por variaciones de tipeo/mayúsculas
+// (ej: "Almacén" vs "almacen "): si ya existe una igual salvo casing/espacios,
+// reutiliza esa exacta en vez de crear una nueva.
+function normalizeCategoria(input){
+  const trimmed = (input || '').trim().replace(/\s+/g, ' ');
+  if(!trimmed) return 'Sin categoría';
+  const todas = new Set();
+  STATE.stock.forEach(p => todas.add(p.categoria || 'Sin categoría'));
+  STATE.lista.forEach(i => todas.add(i.categoria || 'Sin categoría'));
+  const existing = Array.from(todas).find(c => c.toLowerCase() === trimmed.toLowerCase());
+  return existing || trimmed;
 }
 
 function renderCatOptions(){
@@ -641,11 +691,21 @@ $('#stockList').addEventListener('click', async (e) => {
     STATE = await api('adjustStock', { id, delta: -1 });
     renderAll();
   } else if(target.dataset.act === 'delProduct'){
-    if(confirm('¿Eliminar este producto del stock?')){
-      setBusy(target, true);
-      STATE = await api('deleteProduct', { id });
+    const product = STATE.stock.find(p => p.id === id);
+    setBusy(target, true);
+    STATE = await api('deleteProduct', { id });
+    renderAll();
+    toast(`"${product.producto}" eliminado`, false, async () => {
+      STATE = await api('addProduct', {
+        producto: product.producto,
+        categoria: product.categoria,
+        cantidad: product.cantidad,
+        unidad: product.unidad,
+        stockMinimo: product.stockMinimo
+      });
       renderAll();
-    }
+      toast('Producto restaurado');
+    });
   }
 });
 
@@ -667,7 +727,7 @@ $('#p_save').addEventListener('click', async () => {
   if(!nombre){ toast('Poné un nombre', true); return; }
   const payload = {
     producto: nombre,
-    categoria: $('#p_categoria').value.trim() || 'Sin categoría',
+    categoria: normalizeCategoria($('#p_categoria').value),
     cantidad: $('#p_cantidad').value,
     unidad: $('#p_unidad').value.trim() || 'u',
     stockMinimo: $('#p_min').value
@@ -702,9 +762,20 @@ $('#listaList').addEventListener('click', async (e) => {
     STATE = await api('toggleComprado', { id });
     renderAll();
   } else if(target.dataset.act === 'delLista'){
+    const item = STATE.lista.find(i => i.id === id);
     setBusy(target, true);
     STATE = await api('deleteFromShoppingList', { id });
     renderAll();
+    toast(`"${item.producto}" eliminado`, false, async () => {
+      STATE = await api('addToShoppingList', {
+        producto: item.producto,
+        categoria: item.categoria,
+        cantidad: item.cantidad,
+        origen: item.origen
+      });
+      renderAll();
+      toast('Item restaurado');
+    });
   }
 });
 
@@ -751,7 +822,7 @@ $('#m_save').addEventListener('click', async () => {
   if(!nombre){ toast('Poné un nombre', true); return; }
   const payload = {
     producto: nombre,
-    categoria: $('#m_categoria').value.trim() || 'Sin categoría',
+    categoria: normalizeCategoria($('#m_categoria').value),
     cantidad: $('#m_cantidad').value
   };
   setBusy($('#m_save'), true);
