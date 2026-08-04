@@ -159,6 +159,18 @@ function addToShoppingList(payload) {
   return getAllData();
 }
 
+function updateShoppingListItem(payload) {
+  const sheet = getOrCreateSheet(SHEET_LISTA, LISTA_HEADERS);
+  const items = sheetToObjects(sheet, LISTA_HEADERS);
+  const item = items.find(i => i.id === payload.id);
+  if (!item) throw new Error('Item no encontrado');
+  const row = item._row;
+  if (payload.producto !== undefined) sheet.getRange(row, 2).setValue(payload.producto);
+  if (payload.categoria !== undefined) sheet.getRange(row, 3).setValue(payload.categoria);
+  if (payload.cantidad !== undefined) sheet.getRange(row, 4).setValue(Number(payload.cantidad));
+  return getAllData();
+}
+
 function toggleComprado(payload) {
   const sheet = getOrCreateSheet(SHEET_LISTA, LISTA_HEADERS);
   const items = sheetToObjects(sheet, LISTA_HEADERS);
@@ -252,6 +264,9 @@ function doPost(e) {
         break;
       case 'addToShoppingList':
         data = addToShoppingList(payload);
+        break;
+      case 'updateShoppingListItem':
+        data = updateShoppingListItem(payload);
         break;
       case 'toggleComprado':
         data = toggleComprado(payload);

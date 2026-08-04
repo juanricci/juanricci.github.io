@@ -480,7 +480,7 @@ async function loadData(){
 function setBusy(el, busy){
   if(!el) return;
   if(busy){
-    el._label = el._label ?? el.textContent;
+    el._label = el.textContent;
     el.disabled = true;
     el.dataset.busy = '1';
     el.textContent = '…';
@@ -600,7 +600,7 @@ function listRow(i, done){
   return `
     <div class="row check-row ${done ? 'done' : ''}" data-id="${i.id}">
       <input type="checkbox" data-act="toggle" data-id="${i.id}" ${done ? 'checked' : ''}>
-      <div class="name">${escapeHtml(i.producto)} ${i.origen === 'auto' ? '<span class="origin-auto">auto</span>' : ''}<span class="cat-pill">cant: ${i.cantidad}</span></div>
+      <div class="name" data-act="editLista" data-id="${i.id}" style="cursor:pointer">${escapeHtml(i.producto)} ${i.origen === 'auto' ? '<span class="origin-auto">auto</span>' : ''}<span class="cat-pill">cant: ${i.cantidad}</span></div>
       <button class="del" data-act="delLista" data-id="${i.id}">✕</button>
     </div>`;
 }
@@ -691,10 +691,13 @@ $('#p_save').addEventListener('click', async () => {
 
 // ---------- Lista actions ----------
 $('#listaList').addEventListener('click', async (e) => {
-  const target = e.target;
+  const target = e.target.closest('[data-act]');
+  if(!target) return;
   const id = target.dataset.id;
   if(!id) return;
-  if(target.dataset.act === 'toggle'){
+  if(target.dataset.act === 'editLista'){
+    openListaDialog(STATE.lista.find(i => i.id === id));
+  } else if(target.dataset.act === 'toggle'){
     setBusy(target, true);
     STATE = await api('toggleComprado', { id });
     renderAll();
@@ -729,12 +732,19 @@ $('#btnClearDone').addEventListener('click', async () => {
   }
 });
 
-$('#btnAddManual').addEventListener('click', () => {
-  $('#m_nombre').value = '';
-  $('#m_categoria').value = '';
-  $('#m_cantidad').value = 1;
+let editingListId = null;
+
+function openListaDialog(item){
+  editingListId = item ? item.id : null;
+  $('#dlgManual h2').textContent = item ? 'editar item' : 'agregar a la lista';
+  $('#m_save').textContent = item ? 'Guardar' : 'Agregar';
+  $('#m_nombre').value = item ? item.producto : '';
+  $('#m_categoria').value = item ? item.categoria : '';
+  $('#m_cantidad').value = item ? item.cantidad : 1;
   $('#dlgManual').showModal();
-});
+}
+
+$('#btnAddManual').addEventListener('click', () => openListaDialog(null));
 $('#m_cancel').addEventListener('click', () => $('#dlgManual').close());
 $('#m_save').addEventListener('click', async () => {
   const nombre = $('#m_nombre').value.trim();
@@ -742,15 +752,21 @@ $('#m_save').addEventListener('click', async () => {
   const payload = {
     producto: nombre,
     categoria: $('#m_categoria').value.trim() || 'Sin categoría',
-    cantidad: $('#m_cantidad').value,
-    origen: 'manual'
+    cantidad: $('#m_cantidad').value
   };
   setBusy($('#m_save'), true);
   try{
-    STATE = await api('addToShoppingList', payload);
+    if(editingListId){
+      payload.id = editingListId;
+      STATE = await api('updateShoppingListItem', payload);
+      toast('Item actualizado');
+    } else {
+      payload.origen = 'manual';
+      STATE = await api('addToShoppingList', payload);
+      toast('Agregado a la lista');
+    }
     renderAll();
     $('#dlgManual').close();
-    toast('Agregado a la lista');
   } finally {
     setBusy($('#m_save'), false);
   }
