@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Despensa — Stock y Compras</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1F4D38">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Despensa">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -59,6 +66,13 @@
     border-radius:20px;
     padding:2px 8px;
   }
+  button.tag{
+    background:var(--paper-card);
+    line-height:1;
+    font-size:13px;
+  }
+  button.tag.spin{animation:spin .6s linear;}
+  @keyframes spin{ to { transform:rotate(360deg); } }
   .sub{color:var(--ink-soft); font-size:14px; margin-top:4px;}
 
   nav.tabs{
@@ -338,6 +352,7 @@
   <div class="brand">
     <h1>despensa</h1>
     <span class="tag" id="statusTag">offline</span>
+    <button class="tag" id="btnRefresh" title="Refrescar" style="cursor:pointer">⟳</button>
   </div>
   <div class="sub">stock de casa + lista de compras</div>
 </header>
@@ -793,11 +808,26 @@ $('#btnSuggest').addEventListener('click', async () => {
 
 $('#btnClearDone').addEventListener('click', async () => {
   const btn = $('#btnClearDone');
+  const comprados = STATE.lista.filter(i => i.comprado);
+  if(comprados.length === 0) return;
   setBusy(btn, true);
   try{
     STATE = await api('clearComprados');
     renderAll();
-    toast('Lista limpiada');
+    toast(`${comprados.length} item(s) borrados`, false, async () => {
+      for(const item of comprados){
+        STATE = await api('addToShoppingList', {
+          producto: item.producto,
+          categoria: item.categoria,
+          cantidad: item.cantidad,
+          origen: item.origen
+        });
+        const nuevo = STATE.lista.find(i => i.producto === item.producto && i.categoria === item.categoria && !i.comprado);
+        if(nuevo) STATE = await api('toggleComprado', { id: nuevo.id });
+      }
+      renderAll();
+      toast('Lista restaurada');
+    });
   } finally {
     setBusy(btn, false);
   }
@@ -840,6 +870,18 @@ $('#m_save').addEventListener('click', async () => {
     $('#dlgManual').close();
   } finally {
     setBusy($('#m_save'), false);
+  }
+});
+
+$('#btnRefresh').addEventListener('click', async () => {
+  const btn = $('#btnRefresh');
+  btn.disabled = true;
+  btn.classList.add('spin');
+  try{
+    await loadData();
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('spin');
   }
 });
 
