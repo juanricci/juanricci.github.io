@@ -200,13 +200,17 @@ function clearComprados() {
   return getAllData();
 }
 
-// Genera sugerencias: productos de Stock por debajo del mínimo
-// que todavía no están (no comprados) en la lista de compras.
+// Genera sugerencias: agrega a la lista los productos de Stock por debajo
+// del mínimo que todavía no están (no comprados), y quita de la lista los
+// items 'auto' pendientes cuyo stock ya dejó de estar bajo mínimo.
 function generateSuggestions() {
   const stockSheet = getOrCreateSheet(SHEET_STOCK, STOCK_HEADERS);
   const listaSheet = getOrCreateSheet(SHEET_LISTA, LISTA_HEADERS);
   const stock = sheetToObjects(stockSheet, STOCK_HEADERS);
   const lista = sheetToObjects(listaSheet, LISTA_HEADERS);
+
+  const stockPorNombre = {};
+  stock.forEach(p => { stockPorNombre[p.producto] = p; });
 
   const yaEnLista = new Set(
     lista.filter(i => !i.comprado).map(i => i.producto)
@@ -226,6 +230,17 @@ function generateSuggestions() {
       false
     ]);
   });
+
+  // productos auto, pendientes, que ya no están bajo mínimo (o fueron repuestos)
+  const yaNoBajos = lista.filter(i => {
+    if (i.origen !== 'auto' || i.comprado) return false;
+    const p = stockPorNombre[i.producto];
+    if (!p) return false; // el producto ya no existe en Stock, no se toca
+    return Number(p.cantidad) > Number(p.stockMinimo);
+  });
+  yaNoBajos
+    .sort((a, b) => b._row - a._row) // de abajo hacia arriba, para no romper índices
+    .forEach(i => listaSheet.deleteRow(i._row));
 
   return getAllData();
 }
