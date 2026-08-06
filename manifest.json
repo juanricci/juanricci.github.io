@@ -1,7 +1,7 @@
 {
-  "name": "Despensa — Stock y Compras",
-  "short_name": "Despensa",
-  "description": "Stock de casa + lista de compras",
+  "name": "¿Qué hay en casa?",
+  "short_name": "¿Qué hay?",
+  "description": "Y, ¿qué falta?",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
