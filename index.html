@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>¿Qué hay en casa?</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
@@ -112,7 +112,7 @@
   }
   select, input[type=text], input[type=number]{
     font-family:'Public Sans', sans-serif;
-    font-size:14px;
+    font-size:16px;
     padding:8px 10px;
     border:1px solid var(--line);
     border-radius:8px;
@@ -313,8 +313,9 @@
 
   .toast{
     position:fixed;
-    bottom:20px;
+    bottom:calc(20px + env(safe-area-inset-bottom, 0px));
     left:50%;
+    max-width:calc(100% - 32px);
     transform:translateX(-50%) translateY(120%);
     background:var(--green-dark);
     color:#fff;
