@@ -376,6 +376,9 @@
   <section class="view" id="view-lista">
     <div class="toolbar">
       <input type="text" id="listaSearch" placeholder="Buscar producto...">
+      <select id="catFilterLista"><option value="">Todas las categorías</option></select>
+    </div>
+    <div class="toolbar">
       <button class="btn secondary" id="btnSuggest">Generar sugerencias</button>
       <button class="btn ghost" id="btnClearDone">Vaciar comprados</button>
       <button class="btn" id="btnAddManual">+ Item</button>
@@ -549,6 +552,12 @@ function categorias(){
   return Array.from(cats).sort();
 }
 
+function categoriasLista(){
+  const cats = new Set();
+  STATE.lista.forEach(i => cats.add(i.categoria || 'Sin categoría'));
+  return Array.from(cats).sort();
+}
+
 // Evita categorías duplicadas por variaciones de tipeo/mayúsculas
 // (ej: "Almacén" vs "almacen "): si ya existe una igual salvo casing/espacios,
 // reutiliza esa exacta en vez de crear una nueva.
@@ -569,6 +578,13 @@ function renderCatOptions(){
   sel.innerHTML = '<option value="">Todas las categorías</option>' +
     cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
   sel.value = current;
+
+  const catsLista = categoriasLista();
+  const selLista = $('#catFilterLista');
+  const currentLista = selLista.value;
+  selLista.innerHTML = '<option value="">Todas las categorías</option>' +
+    catsLista.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  selLista.value = currentLista;
 
   ['#catDatalist', '#catDatalist2'].forEach(id => {
     $(id).innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
@@ -632,7 +648,10 @@ function renderStock(){
 function renderLista(){
   const container = $('#listaList');
   const search = $('#listaSearch').value.trim().toLowerCase();
-  const filtered = STATE.lista.filter(i => !search || i.producto.toLowerCase().includes(search));
+  const filter = $('#catFilterLista').value;
+  const filtered = STATE.lista
+    .filter(i => !filter || i.categoria === filter)
+    .filter(i => !search || i.producto.toLowerCase().includes(search));
   const pendientes = filtered.filter(i => !i.comprado);
   const comprados = filtered.filter(i => i.comprado);
 
@@ -689,6 +708,7 @@ $$('nav.tabs button').forEach(btn => {
 $('#catFilter').addEventListener('change', renderStock);
 $('#stockSearch').addEventListener('input', renderStock);
 $('#listaSearch').addEventListener('input', renderLista);
+$('#catFilterLista').addEventListener('change', renderLista);
 
 // ---------- Stock actions ----------
 $('#stockList').addEventListener('click', async (e) => {
