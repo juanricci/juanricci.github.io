@@ -27,6 +27,26 @@
     --line: #D8D4C4;
     --line-dotted: #C9C5B8;
     --shadow: 0 1px 2px rgba(31,42,31,0.06), 0 4px 14px rgba(31,42,31,0.05);
+    --toast-bg: var(--green-dark);
+    --auto-bg: #E4EFE8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper: #15211A;
+      --paper-card: #1E2C22;
+      --ink: #EDEDE3;
+      --ink-soft: #93A08F;
+      --green: #4FA179;
+      --green-dark: #9FD9BB;
+      --amber: #E0A84D;
+      --amber-bg: #3A2F16;
+      --red: #E2685A;
+      --line: #34423A;
+      --line-dotted: #2A362E;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 14px rgba(0,0,0,0.35);
+      --toast-bg: #2E6B4C;
+      --auto-bg: #1F3D2C;
+    }
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -238,7 +258,7 @@
     font-family:'IBM Plex Mono', monospace;
     font-size:9.5px;
     color:var(--green-dark);
-    background:#E4EFE8;
+    background:var(--auto-bg);
     border-radius:20px;
     padding:1px 6px;
     margin-left:6px;
@@ -319,7 +339,7 @@
     transform:translateX(-50%) translateY(120%);
     opacity:0;
     pointer-events:none;
-    background:var(--green-dark);
+    background:var(--toast-bg);
     color:#fff;
     padding:10px 18px;
     border-radius:8px;
@@ -383,6 +403,7 @@
     </div>
     <div class="toolbar">
       <button class="btn secondary" id="btnSuggest">Generar sugerencias</button>
+      <button class="btn secondary" id="btnShare">Compartir</button>
       <button class="btn ghost" id="btnClearDone">Vaciar comprados</button>
       <button class="btn" id="btnAddManual">+ Item</button>
     </div>
@@ -436,9 +457,15 @@
       <input type="text" id="m_categoria" placeholder="Ej: Limpieza" list="catDatalist2">
       <datalist id="catDatalist2"></datalist>
     </div>
-    <div class="field">
-      <label>Cantidad</label>
-      <input type="number" id="m_cantidad" value="1" min="1">
+    <div class="field-row">
+      <div class="field">
+        <label>Cantidad</label>
+        <input type="number" id="m_cantidad" value="1" min="1">
+      </div>
+      <div class="field">
+        <label>Precio (opcional)</label>
+        <input type="number" id="m_precio" placeholder="0" min="0" step="0.01">
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn secondary" id="m_cancel">Cancelar</button>
@@ -687,7 +714,7 @@ function listRow(i, done){
   return `
     <div class="row check-row ${done ? 'done' : ''}" data-id="${i.id}">
       <input type="checkbox" data-act="toggle" data-id="${i.id}" ${done ? 'checked' : ''}>
-      <div class="name" data-act="editLista" data-id="${i.id}" style="cursor:pointer">${escapeHtml(i.producto)} ${i.origen === 'auto' ? '<span class="origin-auto">auto</span>' : ''}<span class="cat-pill">cant: ${i.cantidad}</span></div>
+      <div class="name" data-act="editLista" data-id="${i.id}" style="cursor:pointer">${escapeHtml(i.producto)} ${i.origen === 'auto' ? '<span class="origin-auto">auto</span>' : ''}<span class="cat-pill">cant: ${i.cantidad}${i.precio ? ` · $${i.precio}` : ''}</span></div>
       <button class="del" data-act="delLista" data-id="${i.id}">✕</button>
     </div>`;
 }
@@ -796,8 +823,18 @@ $('#listaList').addEventListener('click', async (e) => {
   if(target.dataset.act === 'editLista'){
     openListaDialog(STATE.lista.find(i => i.id === id));
   } else if(target.dataset.act === 'toggle'){
+    const item = STATE.lista.find(i => i.id === id);
+    const seVaAComprar = !item.comprado;
     setBusy(target, true);
     STATE = await api('toggleComprado', { id });
+    const match = STATE.stock.find(p => p.producto.trim().toLowerCase() === item.producto.trim().toLowerCase());
+    if(match){
+      const delta = seVaAComprar ? Number(item.cantidad) : -Number(item.cantidad);
+      STATE = await api('adjustStock', { id: match.id, delta });
+      toast(seVaAComprar
+        ? `Sumado a stock: ${match.producto} (+${item.cantidad})`
+        : `Restado de stock: ${match.producto} (-${item.cantidad})`);
+    }
     renderAll();
   } else if(target.dataset.act === 'delLista'){
     const item = STATE.lista.find(i => i.id === id);
@@ -809,11 +846,45 @@ $('#listaList').addEventListener('click', async (e) => {
         producto: item.producto,
         categoria: item.categoria,
         cantidad: item.cantidad,
-        origen: item.origen
+        origen: item.origen,
+        precio: item.precio || ''
       });
       renderAll();
       toast('Item restaurado');
     });
+  }
+});
+
+function textoListaCompartible(){
+  const pendientes = STATE.lista.filter(i => !i.comprado);
+  let texto = '¿Qué hay en casa? — Lista de compras\n';
+  const grouped = groupBy(pendientes, 'categoria');
+  Object.keys(grouped).sort().forEach(cat => {
+    texto += `\n${cat.toUpperCase()}\n`;
+    grouped[cat].forEach(i => {
+      texto += `- ${i.producto} (x${i.cantidad})\n`;
+    });
+  });
+  return texto.trim();
+}
+
+$('#btnShare').addEventListener('click', async () => {
+  const pendientes = STATE.lista.filter(i => !i.comprado);
+  if(pendientes.length === 0){ toast('No hay items pendientes para compartir', true); return; }
+  const texto = textoListaCompartible();
+  if(navigator.share){
+    try{
+      await navigator.share({ text: texto });
+    }catch(err){
+      if(err.name !== 'AbortError') toast('No se pudo compartir', true);
+    }
+  } else {
+    try{
+      await navigator.clipboard.writeText(texto);
+      toast('Lista copiada al portapapeles');
+    }catch(err){
+      toast('No se pudo copiar la lista', true);
+    }
   }
 });
 
@@ -833,17 +904,20 @@ $('#btnClearDone').addEventListener('click', async () => {
   const btn = $('#btnClearDone');
   const comprados = STATE.lista.filter(i => i.comprado);
   if(comprados.length === 0) return;
+  const totalGastado = comprados.reduce((sum, i) => sum + (Number(i.precio) || 0) * Number(i.cantidad), 0);
   setBusy(btn, true);
   try{
     STATE = await api('clearComprados');
     renderAll();
-    toast(`${comprados.length} item(s) borrados`, false, async () => {
+    const totalTxt = totalGastado > 0 ? ` — gastaste $${totalGastado.toFixed(2)}` : '';
+    toast(`${comprados.length} item(s) borrados${totalTxt}`, false, async () => {
       for(const item of comprados){
         STATE = await api('addToShoppingList', {
           producto: item.producto,
           categoria: item.categoria,
           cantidad: item.cantidad,
-          origen: item.origen
+          origen: item.origen,
+          precio: item.precio || ''
         });
         const nuevo = STATE.lista.find(i => i.producto === item.producto && i.categoria === item.categoria && !i.comprado);
         if(nuevo) STATE = await api('toggleComprado', { id: nuevo.id });
@@ -865,6 +939,7 @@ function openListaDialog(item){
   $('#m_nombre').value = item ? item.producto : '';
   $('#m_categoria').value = item ? item.categoria : '';
   $('#m_cantidad').value = item ? item.cantidad : 1;
+  $('#m_precio').value = item && item.precio ? item.precio : '';
   $('#dlgManual').showModal();
 }
 
@@ -876,7 +951,8 @@ $('#m_save').addEventListener('click', async () => {
   const payload = {
     producto: nombre,
     categoria: normalizeCategoria($('#m_categoria').value),
-    cantidad: $('#m_cantidad').value
+    cantidad: $('#m_cantidad').value,
+    precio: $('#m_precio').value || ''
   };
   setBusy($('#m_save'), true);
   try{

@@ -20,7 +20,7 @@ const SHEET_STOCK = 'Stock';
 const SHEET_LISTA = 'ListaCompras';
 
 const STOCK_HEADERS = ['id', 'producto', 'categoria', 'cantidad', 'unidad', 'stockMinimo', 'actualizado'];
-const LISTA_HEADERS = ['id', 'producto', 'categoria', 'cantidad', 'origen', 'comprado'];
+const LISTA_HEADERS = ['id', 'producto', 'categoria', 'cantidad', 'origen', 'comprado', 'precio'];
 
 // Ejecutar UNA VEZ manualmente desde el editor (Run > setToken) para guardar
 // el token en Script Properties. No queda en el código, así no lo ve nadie
@@ -154,7 +154,8 @@ function addToShoppingList(payload) {
     payload.categoria || 'Sin categoría',
     Number(payload.cantidad) || 1,
     payload.origen || 'manual',
-    false
+    false,
+    payload.precio !== undefined && payload.precio !== '' ? Number(payload.precio) : ''
   ]);
   return getAllData();
 }
@@ -168,6 +169,7 @@ function updateShoppingListItem(payload) {
   if (payload.producto !== undefined) sheet.getRange(row, 2).setValue(payload.producto);
   if (payload.categoria !== undefined) sheet.getRange(row, 3).setValue(payload.categoria);
   if (payload.cantidad !== undefined) sheet.getRange(row, 4).setValue(Number(payload.cantidad));
+  if (payload.precio !== undefined) sheet.getRange(row, 7).setValue(payload.precio === '' ? '' : Number(payload.precio));
   return getAllData();
 }
 
