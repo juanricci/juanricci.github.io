@@ -417,7 +417,7 @@
     <h2>nuevo producto</h2>
     <div class="field">
       <label>Nombre</label>
-      <input type="text" id="p_nombre" placeholder="Ej: Aceite de girasol">
+      <input type="text" id="p_nombre" placeholder="Ej: Aceite de girasol" list="productoDatalist">
     </div>
     <div class="field">
       <label>Categoría</label>
@@ -450,7 +450,7 @@
     <h2>agregar a la lista</h2>
     <div class="field">
       <label>Producto</label>
-      <input type="text" id="m_nombre" placeholder="Ej: Servilletas">
+      <input type="text" id="m_nombre" placeholder="Ej: Servilletas" list="productoDatalist">
     </div>
     <div class="field">
       <label>Categoría</label>
@@ -473,6 +473,8 @@
     </div>
   </div>
 </dialog>
+
+<datalist id="productoDatalist"></datalist>
 
 <div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo" class="toastUndo" style="display:none">Deshacer</button></div>
 
@@ -601,6 +603,22 @@ function normalizeCategoria(input){
   return existing || trimmed;
 }
 
+function productosStock(){
+  const nombres = new Set();
+  STATE.stock.forEach(p => nombres.add(p.producto));
+  return Array.from(nombres).sort();
+}
+
+// Si ya existe un producto en Stock con el mismo nombre salvo casing/espacios,
+// reutiliza ese nombre exacto. Así "leche" o "Leche  " matchean con "Leche" y
+// el chequeo de la Lista de compras puede sincronizar el stock correctamente.
+function normalizeProducto(input){
+  const trimmed = (input || '').trim().replace(/\s+/g, ' ');
+  if(!trimmed) return trimmed;
+  const existing = productosStock().find(p => p.toLowerCase() === trimmed.toLowerCase());
+  return existing || trimmed;
+}
+
 function renderCatOptions(){
   const cats = categorias();
   const sel = $('#catFilter');
@@ -619,6 +637,8 @@ function renderCatOptions(){
   ['#catDatalist', '#catDatalist2'].forEach(id => {
     $(id).innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
   });
+
+  $('#productoDatalist').innerHTML = productosStock().map(p => `<option value="${escapeHtml(p)}">`).join('');
 }
 
 function escapeHtml(str){
@@ -788,7 +808,7 @@ function openProductDialog(product){
 $('#btnAddProduct').addEventListener('click', () => openProductDialog(null));
 $('#p_cancel').addEventListener('click', () => $('#dlgProduct').close());
 $('#p_save').addEventListener('click', async () => {
-  const nombre = $('#p_nombre').value.trim();
+  const nombre = normalizeProducto($('#p_nombre').value);
   if(!nombre){ toast('Poné un nombre', true); return; }
   const payload = {
     producto: nombre,
@@ -946,7 +966,7 @@ function openListaDialog(item){
 $('#btnAddManual').addEventListener('click', () => openListaDialog(null));
 $('#m_cancel').addEventListener('click', () => $('#dlgManual').close());
 $('#m_save').addEventListener('click', async () => {
-  const nombre = $('#m_nombre').value.trim();
+  const nombre = normalizeProducto($('#m_nombre').value);
   if(!nombre){ toast('Poné un nombre', true); return; }
   const payload = {
     producto: nombre,
